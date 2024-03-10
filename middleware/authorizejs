@@ -1,0 +1,48 @@
+const jwt = require("jsonwebtoken");
+
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
+  }
+
+  const tokenParts = token.split(" "); // Split the token into parts (Bearer <token>)
+  if (tokenParts.length !== 2 || tokenParts[0] !== "Bearer") {
+    return res
+      .status(401)
+      .json({ message: "Unauthorized: Invalid token format" });
+  }
+
+  const jwtToken = tokenParts[1]; // Extract the token part
+
+  jwt.verify(jwtToken, process.env.JWT_SECRET, (err, decodedToken) => {
+    if (err) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ message: "Unauthorized: Token expired" });
+      }
+      return res.status(401).json({ message: "Unauthorized: Invalid token" });
+    }
+
+    // Attach user information to request object
+    req.user = decodedToken;
+    next();
+  });
+};
+
+const authorizeRole = (requiredRole) => {
+  return (req, res, next) => {
+    if (
+      !req.user ||
+      !req.user.roles ||
+      !req.user.roles.includes(requiredRole)
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You do not have the required role" });
+    }
+    next();
+  };
+};
+
+module.exports = { verifyToken, authorizeRole };
